@@ -1,0 +1,176 @@
+/*
+ * @Descripttion: description
+ * @Author: jianlinwei
+ * @Date: 2023-05-26 21:07:07
+ * @LastEditTime: 2023-05-27 13:05:33
+ */
+/*
+ * @Descripttion: description
+ * @Author: jianlinwei
+ * @Date: 2023-05-26 21:07:07
+ * @LastEditTime: 2023-05-27 11:54:02
+ */
+package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/karalabe/hid"
+)
+
+type ProtocolPacket struct {
+	Preamble byte
+	Address  [2]byte
+	Code     byte
+	Type     byte
+	Length   byte
+	Payload  []byte
+	Checksum byte
+}
+
+func main() {
+	// 查找HID设备
+	devices := hid.Enumerate(0, 0)
+	// 遍历设备列表
+	var dec *hid.Device
+	for _, device := range devices {
+		fmt.Printf("设备路径：%s\n", device.Path)
+		fmt.Printf("厂商ID（VID）：%d\n", device.VendorID)
+		fmt.Printf("产品ID（PID）：%d\n", device.ProductID)
+		fmt.Println("名称：", device.Product)
+		fmt.Println("--------")
+		if device.VendorID == 1240 && device.ProductID == 831 {
+			dec1, err := device.Open()
+			if err != nil {
+				fmt.Println("打开失败")
+				continue
+			}
+			fmt.Println("成功", dec1)
+			dec = dec1
+		}
+
+	}
+
+	fmt.Println("获取设备：", dec)
+	defer dec.Close()
+
+	//hexStr := "02FFFF210000DF" // 十六进制字符串
+	hexStr := "0205008332010241"
+	// 将十六进制字符串转换为 byte 切片
+	bytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		fmt.Println("解码失败:", err)
+		return
+	}
+	//bytes := BuildCmdPacketByte(2, 65535, 34, 0, nil)
+	// 准备要写入的数据
+	data := bytes
+	fmt.Println(hex.EncodeToString(bytes))
+
+	// 写入数据到HID设备
+	n, err := dec.Write(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Wrote %d bytes\n", len(data))
+	time.Sleep(1 * time.Second)
+
+	go func(dec hid.Device) {
+		fmt.Println("读取")
+		dec.Open()
+		// 读取HID设备的数据
+		readData := make([]byte, 255)
+		n, err = dec.Read(readData)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Read %d bytes: %v\n", n, hex.EncodeToString(readData))
+		fmt.Println("长度：", readData[0])
+	}(*dec)
+	time.Sleep(5 * time.Second)
+
+}
+
+func BuildCmdPacketByte(nHead byte, nAddr int, nCode byte, nType byte, ArgByte []byte) []byte {
+	obj := ProtocolPacket{Preamble: nHead, Code: nCode, Type: nType, Checksum: 0}
+
+	obj.Address[0] = byte(nAddr)
+	obj.Address[1] = byte(nAddr >> 8)
+	obj.Length = byte(len(ArgByte))
+	for i := 0; i < int(obj.Length); i++ {
+		obj.Payload[i] = ArgByte[i]
+	}
+
+	cs := CheckSum(obj)
+	obj.Checksum = cs
+
+	bytes, err := obj.MarshalBinary()
+	if err != nil {
+		fmt.Println("转换失败")
+	}
+	return bytes
+}
+
+func CheckSum(obj ProtocolPacket) byte {
+	var b byte
+
+	b += obj.Preamble
+	b += obj.Address[0]
+	b += obj.Address[1]
+	b += obj.Code
+	b += obj.Type
+	b += byte(obj.Length)
+
+	for i := 0; i < int(obj.Length); i++ {
+		b += obj.Payload[i]
+	}
+
+	return ^b + 1
+}
+
+func (p ProtocolPacket) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p.Preamble)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, p.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, p.Code)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, p.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, p.Length)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(int(p.Length))
+	for i := 0; i < int(p.Length); i++ {
+		err = binary.Write(buf, binary.LittleEndian, p.Payload[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, p.Checksum)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}

@@ -1,0 +1,29 @@
+/*
+ * @Descripttion: description
+ * @Author: jianlinwei
+ * @Date: 2023-05-27 13:14:11
+ * @LastEditTime: 2023-05-27 14:09:10
+ */
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/gotmc/libusb/v2"
+)
+
+func main() {
+	ctx, _ := libusb.NewContext()
+	defer ctx.Close()
+	devices, _ := ctx.DeviceList()
+	for _, device := range devices {
+		usbDeviceDescriptor, _ := device.DeviceDescriptor()
+		handle, _ := device.Open()
+		defer handle.Close()
+		serialNumber, _ := handle.StringDescriptorASCII(usbDeviceDescriptor.SerialNumberIndex)
+		handle.ControlTransfer()
+		log.Printf("Found S/N: %s", serialNumber)
+	}
+	fmt.Println("长度", len(devices))
+}

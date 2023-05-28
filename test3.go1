@@ -1,0 +1,55 @@
+/*
+ * @Descripttion: description
+ * @Author: jianlinwei
+ * @Date: 2023-05-27 11:53:52
+ * @LastEditTime: 2023-05-27 13:16:33
+ */
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/google/gousb" // 导入usb库
+)
+
+func main3() {
+	// 初始化USB上下文
+	ctx := gousb.NewContext()
+	defer ctx.Close()
+	// 查找设备
+	ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+		// 在这里根据设备的VID和PID来过滤需要的设备
+		// 例如，查找VID为0x1234，PID为0x5678的设备
+		fmt.Println("设备", desc)
+		return true
+	})
+
+	// 打开设备
+	dev, err := ctx.OpenDeviceWithVIDPID(gousb.ID(0x1234), gousb.ID(0x5678)) // 替换为实际的设备VID和PID
+	if err != nil {
+		log.Fatalf("无法打开设备: %v", err)
+	}
+	defer dev.Close()
+	fmt.Println("设备")
+
+	// 进行读写操作
+	// 请根据您的UHF读卡器的通信协议进行相应的读写操作
+
+	// // 示例：发送命令
+	// cmd := []byte{0x01, 0x02, 0x03} // 替换为您要发送的命令数据
+	// _, err = dev.Control(gousb.ControlOut|gousb.ControlVendor|gousb.ControlDevice, 0x01, 0x0000, 0x0000, cmd)
+	// if err != nil {
+	// 	log.Fatalf("发送命令失败: %v", err)
+	// }
+
+	// // 示例：接收响应
+	// response := make([]byte, 64) // 根据实际情况调整接收缓冲区大小
+	// _, err = dev.Control(gousb.ControlIn|gousb.ControlVendor|gousb.ControlDevice, 0x01, 0x0000, 0x0000, response)
+	// if err != nil {
+	// 	log.Fatalf("接收响应失败: %v", err)
+	// }
+
+	// // 处理接收到的响应数据
+	// fmt.Printf("接收到的响应数据: %v\n", response)
+}
